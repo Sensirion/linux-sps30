@@ -1,0 +1,56 @@
+image: sensirion/python
+
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  PACKAGE_NAME: "sps30"
+
+test:
+  stage: test
+  tags:
+    - linux
+    - docker
+  script:
+    - apt-get update && apt-get install -y linux-headers-$(uname -r)
+    - export KERNELDIR=/lib/modules/$(uname -r)/build
+    - make check
+    - make clean && make
+
+build:
+  stage: build
+  tags:
+    - linux
+    - docker
+  only:
+    - master
+  script:
+    - echo "Create snapshot artifact"
+  artifacts:
+    expire_in: 1 week
+    name: ${PACKAGE_NAME}-${CI_COMMIT_REF_NAME}
+    paths:
+      - LICENSE
+      - Makefile
+      - README.md
+      - sps30/
+
+deploy:
+  stage: deploy
+  tags:
+    - linux
+    - docker
+  only:
+    - tags
+  script:
+    - echo "Create release artifact"
+  artifacts:
+    name: ${PACKAGE_NAME}-${CI_COMMIT_TAG}
+    paths:
+      - LICENSE
+      - Makefile
+      - README.md
+      - sps30/
+
