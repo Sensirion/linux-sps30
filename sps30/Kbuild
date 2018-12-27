@@ -1,0 +1,6 @@
+# For in-kernel builds add the following line to
+# $KERNELDIR/drivers/iio/chemical/Makefile
+#
+# obj-$(CONFIG_SPS30) += sps30.o
+
+obj-m += sps30.o

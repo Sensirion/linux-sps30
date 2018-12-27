@@ -1,0 +1,12 @@
+# Embed the config section into $KERNELDIR/drivers/iio/chemical/Kconfig
+
+config SPS30
+	tristate "SPS30 particulate matter sensor"
+	depends on I2C
+	select CRC8
+	help
+	  Say Y here to build support for the Sensirion SPS30 particulate
+	  matter sensor.
+	
+	  To compile this driver as a module, choose M here: the module will
+	  be called sps30.
