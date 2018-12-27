@@ -23,6 +23,53 @@
 #include <linux/iio/triggered_buffer.h>
 #include <linux/module.h>
 
+
+/* Sensirion compatibility code for older Kernel versions */
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 21, 0)
+/* use something that exists and is somewhat compatible in units and range */
+#define IIO_MASSCONCENTRATION IIO_CONCENTRATION
+#define IIO_MOD_PM1 36 /* give or take - not merged yet */
+#define IIO_MOD_PM2P5 37 /* give or take - not merged yet */
+#define IIO_MOD_PM4 38 /* give or take - not merged yet */
+#define IIO_MOD_PM10 39 /* give or take - not merged yet */
+#define IIO_MOD_NAME_PM1 "pm1"
+#define IIO_MOD_NAME_PM2P5 "pm2p5"
+#define IIO_MOD_NAME_PM4 "pm4"
+#define IIO_MOD_NAME_PM10 "pm10"
+
+#define SPS30_CHAN(_index, _mod) { \
+	.type = IIO_MASSCONCENTRATION, \
+	.extend_name = IIO_MOD_NAME_ ## _mod, \
+	.channel2 = IIO_MOD_ ## _mod, \
+	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED), \
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE), \
+	.address = _mod, \
+	.scan_index = _index, \
+	.scan_type = { \
+		.sign = 'u', \
+		.realbits = 19, \
+		.storagebits = 32, \
+		.endianness = IIO_CPU, \
+	}, \
+}
+static int sps30_probe(struct i2c_client *client);
+static int sps30_probe_old(struct i2c_client *client,
+			   const struct i2c_device_id *id)
+{
+    return sps30_probe(client);
+}
+#endif /* LINUX_VERSION_CODE */
+#ifndef IIO_DEVICE_ATTR_WO
+#define IIO_ATTR_WO(_name, _addr)       \
+	{ .dev_attr = __ATTR_WO(_name), \
+	  .address = _addr }
+#define IIO_DEVICE_ATTR_WO(_name, _addr)                       \
+	struct iio_dev_attr iio_dev_attr_##_name                \
+	= IIO_ATTR_WO(_name, _addr)
+#endif /* IIO_DEVICE_ATTR_WO */
+
+
 #define SPS30_CRC8_POLYNOMIAL 0x31
 /* max number of bytes needed to store PM measurements or serial string */
 #define SPS30_MAX_READ_SIZE 48
@@ -312,6 +359,7 @@ static const struct iio_info sps30_info = {
 	.read_raw = sps30_read_raw,
 };
 
+#ifndef SPS30_CHAN
 #define SPS30_CHAN(_index, _mod) { \
 	.type = IIO_MASSCONCENTRATION, \
 	.modified = 1, \
@@ -327,6 +375,7 @@ static const struct iio_info sps30_info = {
 		.endianness = IIO_CPU, \
 	}, \
 }
+#endif /* SPS30_CHAN */
 
 static const struct iio_chan_spec sps30_channels[] = {
 	SPS30_CHAN(0, PM1),
@@ -431,7 +480,11 @@ static struct i2c_driver sps30_driver = {
 		.of_match_table = sps30_of_match,
 	},
 	.id_table = sps30_id,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 21, 0)
+	.probe = sps30_probe_old,
+#else
 	.probe_new = sps30_probe,
+#endif /* LINUX_VERSION_CODE */
 };
 module_i2c_driver(sps30_driver);
 
