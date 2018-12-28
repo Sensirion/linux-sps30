@@ -72,15 +72,15 @@ Load the kernel module with the appropriate command:
 
 * Out-of-tree build
 
-      ```bash
-      sudo insmod sps30.ko
-      ```
+  ```bash
+  sudo insmod sps30.ko
+  ```
 
 * In-kernel build
 
-      ```bash
-      sudo modprobe sps30
-      ```
+  ```bash
+  sudo modprobe sps30
+  ```
 
 ### Instantiation
 Instantiate the driver on the correct i2c bus with
@@ -98,7 +98,7 @@ Query device files by reading from the iio subsytem's device:
 cat /sys/bus/iio/devices/iio\:device0/in_concentration_pm2p5_input
 ```
 
-or alternatively on the i2c bus: `/sys/bus/i2c/devices/1-0058/iio:device0/`
+or alternatively on the i2c bus: `/sys/bus/i2c/devices/1-0069/iio:device0/`
 
 ### Unloading
 Unload the driver by removing the device instance and then unloading the module.
