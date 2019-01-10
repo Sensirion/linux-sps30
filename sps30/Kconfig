@@ -4,9 +4,12 @@ config SPS30
 	tristate "SPS30 particulate matter sensor"
 	depends on I2C
 	select CRC8
+	select IIO_TRIGGERED_BUFFER if (IIO_BUFFER)
 	help
 	  Say Y here to build support for the Sensirion SPS30 particulate
 	  matter sensor.
-	
+
+	  Also select IIO_BUFFER to enable triggered buffers.
+
 	  To compile this driver as a module, choose M here: the module will
 	  be called sps30.

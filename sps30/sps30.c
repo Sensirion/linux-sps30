@@ -19,8 +19,10 @@
 #include <linux/iio/buffer.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
+#ifdef CONFIG_IIO_BUFFER
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/triggered_buffer.h>
+#endif /* CONFIG_IIO_BUFFER */
 #include <linux/module.h>
 
 
@@ -59,7 +61,30 @@ static int sps30_probe_old(struct i2c_client *client,
 {
     return sps30_probe(client);
 }
-#endif /* LINUX_VERSION_CODE */
+#endif /* LINUX_VERSION_CODE < 4.21.0 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+/* Disable triggered buffer support on Linux < 4.9.0 due to unsufficient support */
+#ifdef CONFIG_IIO_BUFFER
+#undef CONFIG_IIO_BUFFER
+#endif /* CONFIG_IIO_BUFFER */
+#endif /* LINUX_VERSION_CODE < 4.9.0 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+/* allows to add/remove a custom action to devres stack */
+int devm_add_action(struct device *dev, void (*action)(void *), void *data);
+void devm_remove_action(struct device *dev, void (*action)(void *), void *data);
+
+static inline int devm_add_action_or_reset(struct device *dev,
+					   void (*action)(void *), void *data)
+{
+	int ret;
+
+	ret = devm_add_action(dev, action, data);
+	if (ret)
+		action(data);
+
+	return ret;
+}
+#endif /* LINUX_VERSION_CODE < 4.7.0 */
 #ifndef IIO_DEVICE_ATTR_WO
 #define IIO_ATTR_WO(_name, _addr)       \
 	{ .dev_attr = __ATTR_WO(_name), \
@@ -242,6 +267,7 @@ static int sps30_do_meas(struct sps30_state *state, s32 *data, int size)
 	return 0;
 }
 
+#ifdef CONFIG_IIO_BUFFER
 static irqreturn_t sps30_trigger_handler(int irq, void *p)
 {
 	struct iio_poll_func *pf = p;
@@ -256,13 +282,19 @@ static irqreturn_t sps30_trigger_handler(int irq, void *p)
 	if (ret)
 		goto err;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+	/* Sensirion backwards compatibility code */
+	iio_push_to_buffers(indio_dev, data);
+#else /* LINUX_VERSION_CODE >= 4.8.0 */
 	iio_push_to_buffers_with_timestamp(indio_dev, data,
 					   iio_get_time_ns(indio_dev));
+#endif /* LINUX_VERSION_CODE < 4.8.0 */
 err:
 	iio_trigger_notify_done(indio_dev->trig);
 
 	return IRQ_HANDLED;
 }
+#endif /* CONFIG_IIO_BUFFER */
 
 static int sps30_read_raw(struct iio_dev *indio_dev,
 			  struct iio_chan_spec const *chan,
@@ -454,10 +486,12 @@ static int sps30_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_IIO_BUFFER
 	ret = devm_iio_triggered_buffer_setup(&client->dev, indio_dev, NULL,
 					      sps30_trigger_handler, NULL);
 	if (ret)
 		return ret;
+#endif /* CONFIG_IIO_BUFFER */
 
 	return devm_iio_device_register(&client->dev, indio_dev);
 }
