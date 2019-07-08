@@ -7,8 +7,6 @@
  * I2C slave address: 0x69
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <asm/unaligned.h>
 #include <linux/crc8.h>
 #include <linux/delay.h>
@@ -16,98 +14,10 @@
 #include <linux/iio/buffer.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
-#ifdef CONFIG_IIO_BUFFER
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/triggered_buffer.h>
-#endif /* CONFIG_IIO_BUFFER */
 #include <linux/kernel.h>
 #include <linux/module.h>
-
-
-/* Sensirion compatibility code for older Kernel versions */
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 21, 0)
-/* use something that exists and is somewhat compatible in units and range */
-#define IIO_MASSCONCENTRATION IIO_CONCENTRATION
-#define IIO_MOD_PM1 36 /* give or take - not merged yet */
-#define IIO_MOD_PM2P5 37 /* give or take - not merged yet */
-#define IIO_MOD_PM4 38 /* give or take - not merged yet */
-#define IIO_MOD_PM10 39 /* give or take - not merged yet */
-#define IIO_MOD_NAME_PM1 "pm1"
-#define IIO_MOD_NAME_PM2P5 "pm2p5"
-#define IIO_MOD_NAME_PM4 "pm4"
-#define IIO_MOD_NAME_PM10 "pm10"
-
-#define SPS30_CHAN(_index, _mod) { \
-	.type = IIO_MASSCONCENTRATION, \
-	.extend_name = IIO_MOD_NAME_ ## _mod, \
-	.channel2 = IIO_MOD_ ## _mod, \
-	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED), \
-	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE), \
-	.address = _mod, \
-	.scan_index = _index, \
-	.scan_type = { \
-		.sign = 'u', \
-		.realbits = 19, \
-		.storagebits = 32, \
-		.endianness = IIO_CPU, \
-	}, \
-}
-static int sps30_probe(struct i2c_client *client);
-static int sps30_probe_old(struct i2c_client *client,
-			   const struct i2c_device_id *id)
-{
-    return sps30_probe(client);
-}
-#endif /* LINUX_VERSION_CODE < 4.21.0 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
-/* Disable triggered buffer support on Linux < 4.9.0 due to unsufficient support */
-#ifdef CONFIG_IIO_BUFFER
-#undef CONFIG_IIO_BUFFER
-#endif /* CONFIG_IIO_BUFFER */
-#endif /* LINUX_VERSION_CODE < 4.9.0 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
-/* allows to add/remove a custom action to devres stack */
-int devm_add_action(struct device *dev, void (*action)(void *), void *data);
-void devm_remove_action(struct device *dev, void (*action)(void *), void *data);
-
-static inline int devm_add_action_or_reset(struct device *dev,
-					   void (*action)(void *), void *data)
-{
-	int ret;
-
-	ret = devm_add_action(dev, action, data);
-	if (ret)
-		action(data);
-
-	return ret;
-}
-#endif /* LINUX_VERSION_CODE < 4.7.0 */
-#ifndef IIO_DEVICE_ATTR_WO
-#define IIO_ATTR_WO(_name, _addr)       \
-	{ .dev_attr = __ATTR_WO(_name), \
-	  .address = _addr }
-#define IIO_DEVICE_ATTR_WO(_name, _addr)                       \
-	struct iio_dev_attr iio_dev_attr_##_name                \
-	= IIO_ATTR_WO(_name, _addr)
-#endif /* IIO_DEVICE_ATTR_WO */
-#ifndef IIO_DEVICE_ATTR_RO
-#define IIO_ATTR_RO(_name, _addr)       \
-	{ .dev_attr = __ATTR_RO(_name), \
-	  .address = _addr }
-#define IIO_DEVICE_ATTR_RO(_name, _addr)                       \
-	struct iio_dev_attr iio_dev_attr_##_name                \
-	= IIO_ATTR_RO(_name, _addr)
-#endif /* IIO_DEVICE_ATTR_RO */
-#ifndef IIO_DEVICE_ATTR_RW
-#define IIO_ATTR_RW(_name, _addr)       \
-	{ .dev_attr = __ATTR_RW(_name), \
-	  .address = _addr }
-#define IIO_DEVICE_ATTR_RW(_name, _addr)                       \
-	struct iio_dev_attr iio_dev_attr_##_name                \
-	= IIO_ATTR_RW(_name, _addr)
-#endif /* IIO_DEVICE_ATTR_RW */
-
 
 #define SPS30_CRC8_POLYNOMIAL 0x31
 /* max number of bytes needed to store PM measurements or serial string */
@@ -314,7 +224,6 @@ static int sps30_do_meas(struct sps30_state *state, s32 *data, int size)
 	return 0;
 }
 
-#ifdef CONFIG_IIO_BUFFER
 static irqreturn_t sps30_trigger_handler(int irq, void *p)
 {
 	struct iio_poll_func *pf = p;
@@ -329,19 +238,13 @@ static irqreturn_t sps30_trigger_handler(int irq, void *p)
 	if (ret)
 		goto err;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
-	/* Sensirion backwards compatibility code */
-	iio_push_to_buffers(indio_dev, data);
-#else /* LINUX_VERSION_CODE >= 4.8.0 */
 	iio_push_to_buffers_with_timestamp(indio_dev, data,
 					   iio_get_time_ns(indio_dev));
-#endif /* LINUX_VERSION_CODE < 4.8.0 */
 err:
 	iio_trigger_notify_done(indio_dev->trig);
 
 	return IRQ_HANDLED;
 }
-#endif /* CONFIG_IIO_BUFFER */
 
 static int sps30_read_raw(struct iio_dev *indio_dev,
 			  struct iio_chan_spec const *chan,
@@ -530,7 +433,6 @@ static const struct iio_info sps30_info = {
 	.read_raw = sps30_read_raw,
 };
 
-#ifndef SPS30_CHAN
 #define SPS30_CHAN(_index, _mod) { \
 	.type = IIO_MASSCONCENTRATION, \
 	.modified = 1, \
@@ -546,7 +448,6 @@ static const struct iio_info sps30_info = {
 		.endianness = IIO_CPU, \
 	}, \
 }
-#endif /* SPS30_CHAN */
 
 static const struct iio_chan_spec sps30_channels[] = {
 	SPS30_CHAN(0, PM1),
@@ -612,12 +513,10 @@ static int sps30_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 
-#ifdef CONFIG_IIO_BUFFER
 	ret = devm_iio_triggered_buffer_setup(&client->dev, indio_dev, NULL,
 					      sps30_trigger_handler, NULL);
 	if (ret)
 		return ret;
-#endif /* CONFIG_IIO_BUFFER */
 
 	return devm_iio_device_register(&client->dev, indio_dev);
 }
@@ -640,11 +539,7 @@ static struct i2c_driver sps30_driver = {
 		.of_match_table = sps30_of_match,
 	},
 	.id_table = sps30_id,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 21, 0)
-	.probe = sps30_probe_old,
-#else
 	.probe_new = sps30_probe,
-#endif /* LINUX_VERSION_CODE */
 };
 module_i2c_driver(sps30_driver);
 
