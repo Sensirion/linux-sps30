@@ -1,4 +1,4 @@
-image: sensirion/python
+image: registry.gitlab.sensirion.lokal/sensirion/docker/docker-python:2.7-18.04-1.1.0
 
 stages:
   - test
