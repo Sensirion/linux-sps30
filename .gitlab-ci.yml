@@ -14,8 +14,9 @@ test:
     - linux
     - docker
   script:
-    - apt-get update && apt-get install -y linux-headers-$(uname -r)
-    - export KERNELDIR=/lib/modules/$(uname -r)/build
+    - apt-get -qq update && apt-get -q install -y linux-headers-generic
+    - export KERNELVERSION=$(dpkg -s linux-headers-generic | grep '^Depends:' | sed 's/^.*linux-headers-//')
+    - export KERNELDIR=/lib/modules/${KERNELVERSION}/build
     - make check
     - make clean && make
 
